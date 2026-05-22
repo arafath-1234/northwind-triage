@@ -1,4 +1,4 @@
-Write-up — Northwind Triage Agent
+Northwind Triage Agent
 
 Accuracy Scores
 FieldScoreStrict accuracy (all 4 fields)17/20 = 85.0%
