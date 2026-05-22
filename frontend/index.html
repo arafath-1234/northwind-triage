@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northwind Triage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --border: #d8d4cc;
+      --text: #1a1814;
+      --text-muted: #6b6760;
+      --accent: #b5451b;
+      --accent-light: #f9ede8;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+
+      --p1: #c0392b;
+      --p1-bg: #fdf0ef;
+      --p2: #d68910;
+      --p2-bg: #fef9ec;
+      --p3: #27ae60;
+      --p3-bg: #edfaf3;
+
+      --cat-booking: #2471a3;
+      --cat-quote: #7d3c98;
+      --cat-complaint: #c0392b;
+      --cat-emergency: #c0392b;
+      --cat-billing: #1a5276;
+      --cat-oos: #6b6760;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--text);
+      color: var(--bg);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 3px solid var(--accent);
+    }
+
+    header .logo {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    header .tagline {
+      font-size: 13px;
+      color: #9e9a94;
+      font-weight: 300;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 700px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      background: var(--text);
+      color: var(--bg);
+      padding: 10px 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .panel-body { padding: 20px; }
+
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 12px;
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus { border-color: var(--accent); }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+
+    label {
+      font-size: 11px;
+      font-family: var(--mono);
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    input, select {
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 8px 10px;
+      font-family: var(--sans);
+      font-size: 14px;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus { border-color: var(--accent); }
+
+    button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:hover:not(:disabled) { background: #9a3a16; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Result panel */
+    .result-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+
+    .result-loading {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-bottom: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result-grid { display: flex; flex-direction: column; gap: 0; }
+
+    .result-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-row:last-child { border-bottom: none; }
+
+    .result-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      min-width: 100px;
+      padding-top: 2px;
+    }
+
+    .result-value {
+      font-size: 14px;
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+    }
+
+    .badge-cat-BOOKING    { background: #ebf5fb; color: var(--cat-booking); }
+    .badge-cat-QUOTE      { background: #f5eef8; color: var(--cat-quote); }
+    .badge-cat-COMPLAINT  { background: var(--p1-bg); color: var(--cat-complaint); }
+    .badge-cat-EMERGENCY  { background: #c0392b; color: white; }
+    .badge-cat-BILLING    { background: #eaf2f8; color: var(--cat-billing); }
+    .badge-cat-OUT_OF_SCOPE { background: #f2f2f0; color: var(--cat-oos); }
+
+    .badge-P1 { background: var(--p1); color: white; }
+    .badge-P2 { background: var(--p2); color: white; }
+    .badge-P3 { background: var(--p3); color: white; }
+
+    .badge-review-true  { background: #c0392b; color: white; }
+    .badge-review-false { background: #edfaf3; color: #27ae60; }
+
+    .draft-reply {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 12px 14px;
+      font-size: 14px;
+      line-height: 1.7;
+      border-radius: 0 3px 3px 0;
+      font-style: italic;
+      color: #2c2a26;
+    }
+
+    .reasoning-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .error-banner {
+      background: var(--p1-bg);
+      border: 1px solid #f1948a;
+      border-radius: 3px;
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-size: 13px;
+      color: var(--p1);
+    }
+
+    /* Batch mode */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: 24px;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      background: none;
+      border-radius: 0;
+      width: auto;
+      margin: 0;
+    }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">NORTHWIND / TRIAGE</div>
+    <div class="tagline">Inbound enquiry classification agent</div>
+  </div>
+</header>
+
+<div style="max-width:960px;margin:0 auto;padding:24px 24px 0;">
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('single')">Single message</button>
+    <button class="tab" onclick="switchTab('batch')">Batch results</button>
+  </div>
+</div>
+
+<!-- SINGLE MESSAGE TAB -->
+<div id="tab-single" class="tab-content active">
+  <div class="container">
+    <!-- Input panel -->
+    <div class="panel">
+      <div class="panel-header">Incoming message</div>
+      <div class="panel-body">
+        <textarea id="msg-body" placeholder="Paste the customer message here..."></textarea>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Sender name</label>
+            <input id="msg-sender" type="text" placeholder="e.g. Sarah Patel" />
+          </div>
+          <div class="form-group">
+            <label>Channel</label>
+            <select id="msg-channel">
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+              <option value="webform">Web form</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px;">
+          <label>Subject (optional)</label>
+          <input id="msg-subject" type="text" placeholder="e.g. Dripping tap in ensuite" />
+        </div>
+        <button id="triage-btn" onclick="runTriage()">RUN TRIAGE</button>
+      </div>
+    </div>
+
+    <!-- Result panel -->
+    <div class="panel" id="result-panel">
+      <div class="panel-header">Triage decision</div>
+      <div id="result-content">
+        <div class="result-empty">Paste a message and click Run Triage</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BATCH TAB -->
+<div id="tab-batch" class="tab-content">
+  <div style="max-width:960px;margin:0 auto;padding:0 24px 40px;">
+    <div class="panel">
+      <div class="panel-header">Batch results — run batch_run.py to generate</div>
+      <div class="panel-body">
+        <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">
+          Load your <code style="font-family:var(--mono);font-size:12px;">batch_results.json</code> to view scored results across all 20 messages.
+        </p>
+        <input type="file" id="batch-file" accept=".json" onchange="loadBatchFile(event)" style="font-size:13px;" />
+        <div id="batch-content" style="margin-top:20px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_URL = "http://localhost:8000";
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+  }
+
+  async function runTriage() {
+    const body = document.getElementById('msg-body').value.trim();
+    if (!body) { alert('Please paste a message first.'); return; }
+
+    const btn = document.getElementById('triage-btn');
+    btn.disabled = true;
+    btn.textContent = 'CLASSIFYING...';
+
+    const content = document.getElementById('result-content');
+    content.innerHTML = `<div class="result-loading"><div class="spinner"></div><br/>Running triage...</div>`;
+
+    try {
+      const res = await fetch(`${API_URL}/triage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: body,
+          sender_name: document.getElementById('msg-sender').value || null,
+          channel: document.getElementById('msg-channel').value,
+          subject: document.getElementById('msg-subject').value || null,
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Server error');
+      }
+
+      const data = await res.json();
+      renderResult(data);
+    } catch (e) {
+      content.innerHTML = `<div class="panel-body"><div class="error-banner">Error: ${e.message}<br/><small>Make sure the backend is running on port 8000.</small></div></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'RUN TRIAGE';
+    }
+  }
+
+  function catBadge(cat) {
+    return `<span class="badge badge-cat-${cat}">${cat}</span>`;
+  }
+
+  function priBadge(pri) {
+    const labels = { P1: 'P1 — Same day', P2: 'P2 — 4 business hours', P3: 'P3 — 1 business day' };
+    return `<span class="badge badge-${pri}">${labels[pri] || pri}</span>`;
+  }
+
+  function reviewBadge(flag) {
+    return flag
+      ? `<span class="badge badge-review-true">YES — needs review</span>`
+      : `<span class="badge badge-review-false">No</span>`;
+  }
+
+  function renderResult(data) {
+    const content = document.getElementById('result-content');
+    content.innerHTML = `
+      <div class="result-grid">
+        <div class="result-row">
+          <div class="result-label">Category</div>
+          <div class="result-value">${catBadge(data.category)}</div>
+        </div>
+        <div class="result-row">
+          <div class="result-label">Priority</div>
+          <div class="result-value">${priBadge(data.priority)}</div>
+        </div>
+        <div class="result-row">
+          <div class="result-label">Route to</div>
+          <div class="result-value" style="font-weight:500;">${data.route_to}</div>
+        </div>
+        <div class="result-row">
+          <div class="result-label">Human review</div>
+          <div class="result-value">${reviewBadge(data.needs_human_review)}</div>
+        </div>
+        <div class="result-row" style="flex-direction:column;gap:8px;">
+          <div class="result-label">Draft reply</div>
+          <div class="draft-reply">${data.draft_reply || '<em>(no draft — garbled or spam)</em>'}</div>
+        </div>
+        <div class="result-row" style="flex-direction:column;gap:8px;">
+          <div class="result-label">Reasoning</div>
+          <div class="reasoning-text">${data.reasoning}</div>
+        </div>
+      </div>`;
+  }
+
+  function loadBatchFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        renderBatch(data);
+      } catch {
+        document.getElementById('batch-content').innerHTML = '<div class="error-banner">Invalid JSON file.</div>';
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function renderBatch(data) {
+    const { summary, results } = data;
+    let html = `
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;">
+        ${Object.entries(summary).map(([k, v]) => `
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:12px;text-align:center;">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">${k.replace(/_/g,' ')}</div>
+            <div style="font-family:var(--mono);font-size:20px;font-weight:500;color:${k==='strict_accuracy'?'var(--accent)':'var(--text)'};">${v}</div>
+          </div>`).join('')}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--text);color:var(--bg);">
+            <th style="padding:8px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;font-weight:400;">ID</th>
+            <th style="padding:8px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;font-weight:400;">Category</th>
+            <th style="padding:8px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;font-weight:400;">Priority</th>
+            <th style="padding:8px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;font-weight:400;">Route</th>
+            <th style="padding:8px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;font-weight:400;">Review</th>
+            <th style="padding:8px 12px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;font-weight:400;">Match</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    results.forEach((r, i) => {
+      const ok = r.scores.all_four === 1;
+      const bg = i % 2 === 0 ? '#fff' : 'var(--bg)';
+      html += `
+        <tr style="background:${bg};border-bottom:1px solid var(--border);">
+          <td style="padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--text-muted);">${r.id}</td>
+          <td style="padding:8px 12px;">
+            ${catBadge(r.agent.category)}
+            ${r.scores.category===0 ? `<span style="color:var(--p1);font-size:10px;font-family:var(--mono);margin-left:4px;">→${r.benchmark.category}</span>` : ''}
+          </td>
+          <td style="padding:8px 12px;">
+            ${priBadge(r.agent.priority)}
+            ${r.scores.priority===0 ? `<span style="color:var(--p1);font-size:10px;font-family:var(--mono);margin-left:4px;">→${r.benchmark.priority}</span>` : ''}
+          </td>
+          <td style="padding:8px 12px;font-size:12px;">
+            ${r.agent.route_to}
+            ${r.scores.route_to<1 ? `<div style="color:var(--p1);font-size:10px;font-family:var(--mono);">→${r.benchmark.route_to}</div>` : ''}
+          </td>
+          <td style="padding:8px 12px;">${reviewBadge(r.agent.needs_human_review)}</td>
+          <td style="padding:8px 12px;text-align:center;font-size:18px;">${ok ? '✓' : '✗'}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('batch-content').innerHTML = html;
+  }
+</script>
+</body>
+</html>
